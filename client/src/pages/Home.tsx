@@ -212,7 +212,7 @@ export default function Home() {
         backgroundAttachment: 'fixed',
       }}
     >
-      <header className="flex items-center justify-center py-2.5 sm:py-3 relative shrink-0">
+      <header className="flex items-center justify-center py-2.5 sm:py-3 relative shrink-0 min-h-0">
         <motion.h1
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -224,7 +224,7 @@ export default function Home() {
       </header>
 
       <main
-        className={`flex-1 flex flex-col items-center min-h-0 pb-4 sm:pb-6 ${activeTab === 'gallery' ? 'overflow-y-auto' : gameState === 'levelSelect' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        className={`flex-1 flex flex-col items-center min-h-0 overflow-x-hidden pb-4 sm:pb-6 ${activeTab === 'gallery' ? 'overflow-y-auto' : gameState === 'levelSelect' ? 'overflow-hidden' : 'overflow-y-auto'}`}
       >
         {activeTab === 'gallery' ? (
           <Gallery stars={stars} />
@@ -270,33 +270,34 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="w-full flex flex-col items-center gap-2"
+              className="w-full flex-1 flex flex-col items-center gap-2 min-h-0 overflow-y-auto overflow-x-hidden py-0 px-0"
             >
-              <div className="flex items-center justify-between w-full max-w-[500px] px-3 sm:px-4">
-                <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-start justify-between gap-2 w-full max-w-[500px] px-3 sm:px-4 min-w-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                   <ReferenceImage imageUrl={currentLevel.imageUrl} />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p
-                      className="text-xs sm:text-sm font-semibold"
+                      className="text-xs sm:text-sm font-semibold truncate"
                       style={{ color: '#2C2C2C', fontFamily: "'Noto Serif SC', serif" }}
+                      title={currentLevel.name}
                     >
                       {currentLevel.name}
                     </p>
                     <div
-                      className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs"
+                      className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:gap-x-2 text-[11px] sm:text-xs"
                       style={{ color: '#8B8680' }}
                     >
-                      <span>
+                      <span className="shrink-0">
                         步数：<span style={{ color: '#C4463A', fontWeight: 700 }}>{moveCount}</span>
                       </span>
-                      <span style={{ color: '#D0C9BE' }}>|</span>
-                      <span>
+                      <span className="shrink-0" style={{ color: '#D0C9BE' }}>|</span>
+                      <span className="shrink-0">
                         <span style={{ color: '#C4463A', fontWeight: 700 }}>
                           {formatTime(elapsedTime)}
                         </span>
                       </span>
-                      <span style={{ color: '#D0C9BE' }}>|</span>
-                      <span>
+                      <span className="shrink-0" style={{ color: '#D0C9BE' }}>|</span>
+                      <span className="min-w-0">
                         {currentLevel.zoneName} {currentLevel.gridSize}×{currentLevel.gridSize}
                       </span>
                     </div>
@@ -363,11 +364,8 @@ export default function Home() {
                   }}
                   title="吸附一块到正确位置"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M2 12h4v8H2z" />
-                    <path d="M6 4v16" />
-                    <path d="M18 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
-                    <path d="M14 12h8" />
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 5v13a7 7 0 0 0 14 0V5" />
                   </svg>
                   磁铁
                 </button>
@@ -387,7 +385,7 @@ export default function Home() {
                     <path d="M12 2v10l4 4" />
                     <circle cx="12" cy="12" r="10" />
                   </svg>
-                  沙漏
+                  加30s
                 </button>
                 <button
                   onClick={() => setShowNumbers(!showNumbers)}
@@ -443,7 +441,8 @@ export default function Home() {
         )}
       </main>
 
-      {/* 底部 Tab：主页 | 相册 */}
+      {/* 底部 Tab：仅在主题选择页或相册页显示，进入某主题的关卡选择后不显示 */}
+      {((activeTab === 'home' && gameState === 'themeSelect') || activeTab === 'gallery') && (
       <footer
         className="shrink-0 flex items-center justify-center gap-0 w-full max-w-[500px] mx-auto px-4 py-2.5 sm:py-3 border-t border-[rgba(139,134,128,0.2)]"
       >
@@ -479,6 +478,7 @@ export default function Home() {
           相册
         </button>
       </footer>
+      )}
 
       <AnimatePresence>
         {gameState === 'win' && currentLevel && (

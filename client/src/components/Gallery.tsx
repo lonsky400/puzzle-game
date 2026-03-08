@@ -107,7 +107,7 @@ export default function Gallery({ stars }: GalleryProps) {
         return (
           <section key={themeId} className="mb-6">
             <h3
-              className="text-sm font-semibold mb-2"
+              className="text-sm font-bold mb-2"
               style={{ color: '#6B6560', fontFamily: "'Noto Serif SC', serif" }}
             >
               {themeName[themeId]}

@@ -67,16 +67,25 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
 
   const [canvasSize, setCanvasSize] = useState(getCanvasSize);
 
-  /** 图块宽高比：宽:高 = 2:3（与截图一致，竖长格） */
-  const TILE_ASPECT = 2 / 3;
+  /** 图片尺寸（加载后用于与画布宽高比一致，避免变形） */
+  const [imageSize, setImageSize] = useState<{ w: number; h: number } | null>(null);
+
+  /** 图块宽高比：使用图片实际比例，未加载时默认 2:3 */
+  const tileAspect = imageSize ? imageSize.w / imageSize.h : 2 / 3;
 
   const layout = useMemo(() => {
     const gridSize = engine.gridSize;
     const gap = Math.max(3, Math.round(canvasSize * 0.008));
     const boardWidth = canvasSize;
     const cellWidth = (boardWidth - gap * (gridSize + 1)) / gridSize;
-    const cellHeight = cellWidth / TILE_ASPECT;
+    const cellHeight = cellWidth / tileAspect;
     const boardHeight = gap * (gridSize + 1) + gridSize * cellHeight;
+    const colEdges = Array.from({ length: gridSize + 1 }, (_, c) =>
+      Math.round(gap + c * (cellWidth + gap)),
+    );
+    const rowEdges = Array.from({ length: gridSize + 1 }, (_, r) =>
+      Math.round(gap + r * (cellHeight + gap)),
+    );
     return {
       boardWidth,
       boardHeight,
@@ -84,8 +93,10 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       cellWidth,
       cellHeight,
       gridSize,
+      colEdges,
+      rowEdges,
     };
-  }, [canvasSize, engine.gridSize, TILE_ASPECT]);
+  }, [canvasSize, engine.gridSize, tileAspect]);
 
   useEffect(() => {
     const handleResize = () => setCanvasSize(getCanvasSize());
@@ -96,16 +107,19 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
   // 加载图片
   useEffect(() => {
     setImageLoaded(false);
+    setImageSize(null);
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       imageRef.current = img;
+      setImageSize({ w: img.naturalWidth, h: img.naturalHeight });
       setImageLoaded(true);
     };
     img.onerror = () => {
       const img2 = new Image();
       img2.onload = () => {
         imageRef.current = img2;
+        setImageSize(img2.naturalWidth ? { w: img2.naturalWidth, h: img2.naturalHeight } : null);
         setImageLoaded(true);
       };
       img2.src = imageUrl;
@@ -449,7 +463,7 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const { boardWidth, boardHeight, gap, cellWidth, cellHeight, gridSize } = layout;
+    const { boardWidth, boardHeight, gap, cellWidth, cellHeight, gridSize, colEdges, rowEdges } = layout;
 
     if (canvas.width !== Math.round(boardWidth * dpr) || canvas.height !== Math.round(boardHeight * dpr)) {
       canvas.width = Math.round(boardWidth * dpr);
@@ -532,7 +546,7 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       }
     }
 
-    // 绘制拼图块
+    // 绘制拼图块；scaleOrigin 为合并动效时整组缩放中心，未传则绕本格中心缩放
     const drawPieceAt = (
       pieceId: number,
       pos: number,
@@ -540,18 +554,23 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       offsetY: number,
       alpha: number = 1,
       scale: number = 1,
+      scaleOrigin?: { cx: number; cy: number },
     ) => {
       const piece = engine.getPiece(pieceId);
       const row = Math.floor(pos / gridSize);
       const col = pos % gridSize;
 
-      const baseX = gap + col * (cellWidth + gap) + offsetX;
-      const baseY = gap + row * (cellHeight + gap) + offsetY;
+      // 使用整数像素边界，相邻图块共享同一边界，消除竖向/横向拼接缝
+      const baseX = colEdges[col] + offsetX;
+      const baseY = rowEdges[row] + offsetY;
 
-      const srcW = img.naturalWidth / gridSize;
-      const srcH = img.naturalHeight / gridSize;
-      const srcX = piece.col * srcW;
-      const srcY = piece.row * srcH;
+      // 使用整数像素边界切图，避免亚像素采样产生拼接缝
+      const srcX = Math.floor((piece.col * img.naturalWidth) / gridSize);
+      const srcY = Math.floor((piece.row * img.naturalHeight) / gridSize);
+      const srcX2 = Math.floor(((piece.col + 1) * img.naturalWidth) / gridSize);
+      const srcY2 = Math.floor(((piece.row + 1) * img.naturalHeight) / gridSize);
+      const srcW = srcX2 - srcX;
+      const srcH = srcY2 - srcY;
 
       // 合并检测 — 相邻正确块之间消除间隙
       const mergedRight = col < gridSize - 1 && !engine.shouldShowBorder(pos, pos + 1);
@@ -559,10 +578,14 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       const mergedLeft = col > 0 && !engine.shouldShowBorder(pos, pos - 1);
       const mergedUp = row > 0 && !engine.shouldShowBorder(pos, pos - gridSize);
 
-      const drawX = mergedLeft ? baseX - gap : baseX;
-      const drawY = mergedUp ? baseY - gap : baseY;
-      const drawW = cellWidth + (mergedLeft ? gap : 0) + (mergedRight ? gap : 0);
-      const drawH = cellHeight + (mergedUp ? gap : 0) + (mergedDown ? gap : 0);
+      const drawX = (mergedLeft ? colEdges[col] - gap : colEdges[col]) + offsetX;
+      const drawY = (mergedUp ? rowEdges[row] - gap : rowEdges[row]) + offsetY;
+      const drawW =
+        (mergedRight ? colEdges[col + 1] + gap : colEdges[col + 1]) -
+        (mergedLeft ? colEdges[col] - gap : colEdges[col]);
+      const drawH =
+        (mergedDown ? rowEdges[row + 1] + gap : rowEdges[row + 1]) -
+        (mergedUp ? rowEdges[row] - gap : rowEdges[row]);
 
       const gapRatioX = gap / cellWidth;
       const gapRatioY = gap / cellHeight;
@@ -575,8 +598,8 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       ctx.globalAlpha = alpha;
 
       if (scale !== 1) {
-        const cx = drawX + drawW / 2;
-        const cy = drawY + drawH / 2;
+        const cx = scaleOrigin ? scaleOrigin.cx : drawX + drawW / 2;
+        const cy = scaleOrigin ? scaleOrigin.cy : drawY + drawH / 2;
         ctx.translate(cx, cy);
         ctx.scale(scale, scale);
         ctx.translate(-cx, -cy);
@@ -650,13 +673,36 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       return 1;
     };
 
+    // 合并动效：每组一个几何中心，整组绕该中心缩放，而不是每格独立缩放
+    const mergeGroupCenterByPos = new Map<number, { cx: number; cy: number }>();
+    if (flash) {
+      flash.groups.forEach((memberIds) => {
+        const positions = memberIds.map((id) => engine.getPiece(id).currentPos);
+        let sumCx = 0;
+        let sumCy = 0;
+        for (const pos of positions) {
+          const r = Math.floor(pos / gridSize);
+          const c = pos % gridSize;
+          sumCx += (colEdges[c] + colEdges[c + 1]) / 2;
+          sumCy += (rowEdges[r] + rowEdges[r + 1]) / 2;
+        }
+        const n = positions.length;
+        const cx = sumCx / n;
+        const cy = sumCy / n;
+        for (const pos of positions) {
+          mergeGroupCenterByPos.set(pos, { cx, cy });
+        }
+      });
+    }
+
     // 绘制非拖拽块
     for (let pos = 0; pos < engine.totalPieces; pos++) {
       if (dragPosSet.has(pos)) continue;
       const pieceId = engine.getPieceAtPos(pos);
       if (pieceId === -1) continue;
       const scale = mergeScaleAt(pos);
-      drawPieceAt(pieceId, pos, 0, 0, 1, scale);
+      const scaleOrigin = mergeGroupCenterByPos.get(pos);
+      drawPieceAt(pieceId, pos, 0, 0, 1, scale, scaleOrigin);
     }
 
     // 拖拽时：棋盘上只画 ghost；跟随鼠标的浮动块由全屏 overlay 绘制
@@ -781,7 +827,7 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
     if (!isDragging || dragGroupRef.current.length === 0) return;
 
     const boardRect = boardCanvas.getBoundingClientRect();
-    const { boardWidth, boardHeight, gap, cellWidth, cellHeight, gridSize } = layout;
+    const { boardWidth, boardHeight, gap, cellWidth, cellHeight, gridSize, colEdges, rowEdges } = layout;
     const scaleX = boardRect.width / boardWidth;
     const scaleY = boardRect.height / boardHeight;
     const dx = dragCurrentXRef.current - dragStartXRef.current;
@@ -793,29 +839,33 @@ function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: Puzz
       const piece = engine.getPiece(pieceId);
       const row = Math.floor(pos / gridSize);
       const col = pos % gridSize;
-      const baseX = gap + col * (cellWidth + gap);
-      const baseY = gap + row * (cellHeight + gap);
 
       const mergedRight = col < gridSize - 1 && !engine.shouldShowBorder(pos, pos + 1);
       const mergedDown = row < gridSize - 1 && !engine.shouldShowBorder(pos, pos + gridSize);
       const mergedLeft = col > 0 && !engine.shouldShowBorder(pos, pos - 1);
       const mergedUp = row > 0 && !engine.shouldShowBorder(pos, pos - gridSize);
-      const drawXBoard = mergedLeft ? baseX - gap : baseX;
-      const drawYBoard = mergedUp ? baseY - gap : baseY;
-      const drawWBoard = cellWidth + (mergedLeft ? gap : 0) + (mergedRight ? gap : 0);
-      const drawHBoard = cellHeight + (mergedUp ? gap : 0) + (mergedDown ? gap : 0);
+      const drawXBoard = (mergedLeft ? colEdges[col] - gap : colEdges[col]);
+      const drawYBoard = (mergedUp ? rowEdges[row] - gap : rowEdges[row]);
+      const drawWBoard =
+        (mergedRight ? colEdges[col + 1] + gap : colEdges[col + 1]) -
+        (mergedLeft ? colEdges[col] - gap : colEdges[col]);
+      const drawHBoard =
+        (mergedDown ? rowEdges[row + 1] + gap : rowEdges[row + 1]) -
+        (mergedUp ? rowEdges[row] - gap : rowEdges[row]);
 
       const screenX = boardRect.left + drawXBoard * scaleX + dx;
       const screenY = boardRect.top + drawYBoard * scaleY + dy;
       const drawW = drawWBoard * scaleX;
       const drawH = drawHBoard * scaleY;
 
-      const srcW = img.naturalWidth / gridSize;
-      const srcH = img.naturalHeight / gridSize;
+      const srcX = Math.floor((piece.col * img.naturalWidth) / gridSize);
+      const srcY = Math.floor((piece.row * img.naturalHeight) / gridSize);
+      const srcW = Math.floor(((piece.col + 1) * img.naturalWidth) / gridSize) - srcX;
+      const srcH = Math.floor(((piece.row + 1) * img.naturalHeight) / gridSize) - srcY;
       const gapRatioX = gap / cellWidth;
       const gapRatioY = gap / cellHeight;
-      const sSrcX = piece.col * srcW - (mergedLeft ? srcW * gapRatioX : 0);
-      const sSrcY = piece.row * srcH - (mergedUp ? srcH * gapRatioY : 0);
+      const sSrcX = srcX - (mergedLeft ? srcW * gapRatioX : 0);
+      const sSrcY = srcY - (mergedUp ? srcH * gapRatioY : 0);
       const sSrcW = srcW + (mergedLeft ? srcW * gapRatioX : 0) + (mergedRight ? srcW * gapRatioX : 0);
       const sSrcH = srcH + (mergedUp ? srcH * gapRatioY : 0) + (mergedDown ? srcH * gapRatioY : 0);
 

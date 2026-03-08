@@ -84,7 +84,7 @@ export default function LevelSelect({ themeName, levels, stars, onSelect, onBack
   );
 
   return (
-    <div className="w-full flex flex-col items-center min-h-0 flex-1 gap-4 px-4 pb-4">
+    <div className="w-full flex flex-col items-center min-h-0 flex-1 gap-4 px-4 pb-4 overflow-hidden">
       <div className="flex items-center gap-2 w-full max-w-[500px] shrink-0">
         <button
           onClick={onBack}
@@ -107,8 +107,13 @@ export default function LevelSelect({ themeName, levels, stars, onSelect, onBack
       </div>
 
       <div
-        className="w-full max-w-[500px] flex-1 min-h-0 min-h-[50vh] overflow-y-auto overflow-x-hidden overscroll-contain"
-        style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
+        className="w-full max-w-[500px] flex-1 min-h-0 h-0 min-h-[50vh] overflow-y-scroll overflow-x-hidden"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          scrollBehavior: 'smooth',
+          touchAction: 'pan-y',
+          transform: 'translateZ(0)',
+        }}
       >
         <div className="flex flex-col gap-6 w-full pb-6">
           {groups.map((group, groupIndex) => {
