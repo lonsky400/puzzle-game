@@ -61,6 +61,7 @@ function GroupPreview({ level, gridSize }: { level: LevelInfo; gridSize: number 
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         loading="lazy"
+        decoding="async"
       />
       <div
         className="absolute inset-0 pointer-events-none border border-[rgba(0,0,0,0.4)] rounded-lg"
@@ -157,6 +158,7 @@ export default function LevelSelect({ themeName, levels, stars, onSelect, onBack
                               alt={level.name}
                               className="w-full h-full object-cover"
                               loading="lazy"
+                              decoding="async"
                             />
                           </div>
                           <div className="w-full py-0.5 px-1 flex items-center justify-between">

@@ -192,9 +192,6 @@ export default function Home() {
     startGame(getLevelInfo(currentLevel.themeId, currentLevel.levelIndex + 1));
   }, [currentLevel, startGame]);
 
-  const showBackButton = gameState === 'levelSelect' || gameState === 'playing';
-  const onBack = gameState === 'levelSelect' ? handleBackFromLevelSelect : handleBackFromPlaying;
-
   return (
     <div
       className="w-full h-dvh min-h-[100dvh] max-h-dvh flex flex-col overflow-hidden"
@@ -206,28 +203,6 @@ export default function Home() {
       }}
     >
       <header className="flex items-center justify-center py-2.5 sm:py-3 relative shrink-0">
-        {showBackButton && (
-          <button
-            onClick={onBack}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all active:scale-90"
-            style={{
-              backgroundColor: 'rgba(232, 224, 208, 0.85)',
-              boxShadow: '0 1px 4px rgba(60,50,40,0.1)',
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#2C2C2C"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-        )}
         <motion.h1
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -314,6 +289,20 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+                <button
+                  onClick={handleBackFromPlaying}
+                  className="shrink-0 px-3 py-1.5 rounded-md text-xs font-semibold transition-all active:scale-95"
+                  style={{
+                    backgroundColor: 'rgba(232, 224, 208, 0.85)',
+                    color: '#6B6560',
+                    border: '1px solid rgba(139, 134, 128, 0.25)',
+                    fontFamily: "'Noto Serif SC', serif",
+                    boxShadow: '0 1px 3px rgba(60,50,40,0.08)',
+                  }}
+                  title="退出本局，返回关卡选择"
+                >
+                  退出
+                </button>
               </div>
 
               <div className="w-full max-w-[500px] px-3 sm:px-4">

@@ -36,8 +36,9 @@ export function getZoneName(levelIndex: number): string {
   return '王者区';
 }
 
+/** 每组最后一关为 BOSS 关：新手村 10、进阶区 25、挑战区 40、大师区 55、王者区 70 */
 export function isBossLevel(levelIndex: number): boolean {
-  return levelIndex % 10 === 0;
+  return [10, 25, 40, 55, 70].includes(levelIndex);
 }
 
 export function isPanoramaLevel(levelIndex: number): boolean {
@@ -66,20 +67,22 @@ const GUOFENG_IMGS = [
 
 /** 四大主题封面图（年代感/风景/漫画用本地图，国风用项目 CDN） */
 const getBaseUrl = () => (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+/** 发布后缓存破坏：每次构建用不同 URL，关卡图/封面能及时刷新 */
+const cacheBust = () => (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BUILD_ID) ? `?v=${import.meta.env.VITE_BUILD_ID}` : '';
 
 /** 漫画连载主题关卡图（15 张循环使用） */
-const COMIC_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}comic/comic-${i + 1}.png`);
+const COMIC_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}comic/comic-${i + 1}.png${cacheBust()}`);
 
 /** 二次元主题关卡图（15 张循环使用，1–3 为 jpeg，4–15 为 png） */
 const ERCIYUAN_EXTS = ['jpeg', 'jpeg', 'jpeg', ...Array.from({ length: 12 }, () => 'png')];
-const ERCIYUAN_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}erciyuan/erciyuan-${i + 1}.${ERCIYUAN_EXTS[i]}`);
+const ERCIYUAN_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}erciyuan/erciyuan-${i + 1}.${ERCIYUAN_EXTS[i]}${cacheBust()}`);
 
 const THEME_COVERS: Record<ThemeId, string> = {
-  retro: `${getBaseUrl()}theme-cover-retro.png`,
-  marvel: `${getBaseUrl()}theme-cover-comic.png`,
+  retro: `${getBaseUrl()}theme-cover-retro.png${cacheBust()}`,
+  marvel: `${getBaseUrl()}theme-cover-comic.png${cacheBust()}`,
   guofeng:
     'https://d2xsxph8kpxj0f.cloudfront.net/310419663028373717/gXcdKD4ijsoo6c6S8DJhhB/puzzle-img-3-N5zFytSfaCvy4N8ub7jMKv.webp',
-  landscape: `${getBaseUrl()}theme-cover-erciyuan.png`,
+  landscape: `${getBaseUrl()}theme-cover-erciyuan.png${cacheBust()}`,
 };
 
 /** 四大主题（开发环境用同一批图循环） */
