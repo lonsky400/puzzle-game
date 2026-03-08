@@ -50,10 +50,18 @@ export default function Home() {
   const [, setRenderTick] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showNumbers, setShowNumbers] = useState(false);
+  const [bgLoaded, setBgLoaded] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setStars(loadStars());
+  }, []);
+
+  // 背景图懒加载，首屏先展示渐变占位，不阻塞交互
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setBgLoaded(true);
+    img.src = BG_URL;
   }, []);
 
   useEffect(() => {
@@ -196,7 +204,7 @@ export default function Home() {
     <div
       className="w-full h-dvh min-h-[100dvh] max-h-dvh flex flex-col overflow-hidden"
       style={{
-        backgroundImage: `url(${BG_URL})`,
+        backgroundImage: bgLoaded ? `url(${BG_URL})` : 'linear-gradient(180deg, #E8E4DC 0%, #D8D0C4 100%)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',

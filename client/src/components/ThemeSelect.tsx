@@ -58,7 +58,9 @@ export default function ThemeSelect({ onSelect }: ThemeSelectProps) {
                     src={theme.coverImageUrl}
                     alt={THEME_LABELS[theme.id]}
                     className="absolute inset-0 w-full h-full object-cover"
-                    loading="lazy"
+                    loading={index < 2 ? 'eager' : 'lazy'}
+                    fetchPriority={index < 2 ? 'high' : 'low'}
+                    decoding="async"
                     onError={() => handleCoverError(theme.id)}
                   />
                 )}

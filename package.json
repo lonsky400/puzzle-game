@@ -10,7 +10,8 @@
     "preview": "vite preview --host",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "compress-images": "node scripts/compress-puzzle-images.mjs"
+    "compress-images": "node scripts/compress-puzzle-images.mjs",
+    "public-to-webp": "node scripts/public-to-webp.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

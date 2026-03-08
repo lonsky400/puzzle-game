@@ -14,6 +14,7 @@ const ROOT = path.join(__dirname, '..');
 const MAX_SIZE = 1024; // 最长边像素
 const JPEG_QUALITY = 85;
 const PNG_COMPRESSION = 9;
+const WEBP_QUALITY = 82; // WebP 用于 client/public，体积更小、加载更快
 
 const DIRS = [
   { src: path.join(ROOT, 'resources/二次元美女'), publicDir: 'erciyuan', publicExt: null },
@@ -41,33 +42,30 @@ async function compress() {
       const base = path.basename(name, ext);
 
       const originalSize = fs.statSync(srcPath).size;
-      let buf;
+      const num = base.match(/\d+/)?.[0] || base;
       try {
-        let pipeline = sharp(srcPath)
+        const resized = sharp(srcPath)
           .resize(MAX_SIZE, MAX_SIZE, { fit: 'inside', withoutEnlargement: true });
 
+        // 写回 resources：保持 png/jpeg 格式
+        let bufSource;
         if (ext === '.jpg' || ext === '.jpeg') {
-          pipeline = pipeline.jpeg({ quality: JPEG_QUALITY, mozjpeg: true });
+          bufSource = await resized.clone().jpeg({ quality: JPEG_QUALITY, mozjpeg: true }).toBuffer();
         } else {
-          pipeline = pipeline.png({ compressionLevel: PNG_COMPRESSION, effort: 10 });
+          bufSource = await resized.clone().png({ compressionLevel: PNG_COMPRESSION, effort: 10 }).toBuffer();
         }
+        fs.writeFileSync(srcPath, bufSource);
 
-        buf = await pipeline.toBuffer();
+        // client/public 输出 WebP，体积更小、加载更快
+        const bufWebp = await resized.webp({ quality: WEBP_QUALITY }).toBuffer();
+        const publicPath = path.join(publicOut, `${publicDir === 'erciyuan' ? 'erciyuan' : 'comic'}-${num}.webp`);
+        fs.writeFileSync(publicPath, bufWebp);
+
+        const saved = originalSize > 0 ? ((1 - bufWebp.length / originalSize) * 100).toFixed(0) : 0;
+        console.log(`  ${name} -> webp ${(bufWebp.length / 1024).toFixed(0)} KB (saved ~${saved}%)`);
       } catch (e) {
         console.warn('  skip', name, e.message);
-        continue;
       }
-
-      const outExt = publicExt || ext.slice(1).replace(/^\./, '');
-      const num = base.match(/\d+/)?.[0] || base;
-      const publicName = publicDir === 'erciyuan' ? `erciyuan-${num}.${outExt}` : `comic-${num}.${outExt}`;
-      const publicPath = path.join(publicOut, publicName);
-
-      fs.writeFileSync(srcPath, buf);
-      fs.writeFileSync(publicPath, buf);
-
-      const saved = originalSize > 0 ? ((1 - buf.length / originalSize) * 100).toFixed(0) : 0;
-      console.log(`  ${name} -> ${(buf.length / 1024).toFixed(0)} KB (saved ~${saved}%)`);
     }
   }
 

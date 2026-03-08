@@ -70,12 +70,11 @@ const getBaseUrl = () => (typeof import.meta !== 'undefined' && import.meta.env?
 /** 发布后缓存破坏：每次构建用不同 URL，关卡图/封面能及时刷新 */
 const cacheBust = () => (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BUILD_ID) ? `?v=${import.meta.env.VITE_BUILD_ID}` : '';
 
-/** 漫画连载主题关卡图（15 张循环使用） */
-const COMIC_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}comic/comic-${i + 1}.png${cacheBust()}`);
+/** 漫画连载主题关卡图（15 张 WebP，体积小加载快） */
+const COMIC_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}comic/comic-${i + 1}.webp${cacheBust()}`);
 
-/** 二次元主题关卡图（15 张循环使用，1–3 为 jpeg，4–15 为 png） */
-const ERCIYUAN_EXTS = ['jpeg', 'jpeg', 'jpeg', ...Array.from({ length: 12 }, () => 'png')];
-const ERCIYUAN_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}erciyuan/erciyuan-${i + 1}.${ERCIYUAN_EXTS[i]}${cacheBust()}`);
+/** 二次元主题关卡图（15 张 WebP） */
+const ERCIYUAN_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}erciyuan/erciyuan-${i + 1}.webp${cacheBust()}`);
 
 const THEME_COVERS: Record<ThemeId, string> = {
   retro: `${getBaseUrl()}theme-cover-retro.png${cacheBust()}`,
