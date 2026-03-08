@@ -16,7 +16,7 @@ const THEME_LABELS: Record<ThemeId, string> = {
   retro: '年代感',
   marvel: '漫画连载',
   guofeng: '国风动画',
-  landscape: '风景大片',
+  landscape: '二次元',
 };
 
 export default function ThemeSelect({ onSelect }: ThemeSelectProps) {

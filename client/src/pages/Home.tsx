@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import PuzzleBoard from '@/components/PuzzleBoard';
+import PuzzleBoard, { type PuzzleBoardHandle } from '@/components/PuzzleBoard';
 import ThemeSelect from '@/components/ThemeSelect';
 import LevelSelect from '@/components/LevelSelect';
 import WinOverlay from '@/components/WinOverlay';
@@ -144,14 +144,39 @@ export default function Home() {
     [currentTheme],
   );
 
+  const puzzleBoardRef = useRef<PuzzleBoardHandle | null>(null);
+
   const useMagnet = useCallback(() => {
     if (!engine) return;
-    for (let id = 0; id < engine.totalPieces; id++) {
+    const totalPieces = engine.totalPieces;
+    const groupSizesBefore = new Map<number, number>();
+    for (let id = 0; id < totalPieces; id++) {
+      groupSizesBefore.set(id, engine.uf.getGroupSize(id));
+    }
+    for (let id = 0; id < totalPieces; id++) {
       const pos = engine.getPiece(id).currentPos;
       if (pos !== id) {
         engine.swap(pos, id);
         setMoveCount(engine.moveCount);
         setRenderTick((n) => n + 1);
+        const mergedRoots = new Set<number>();
+        for (let i = 0; i < totalPieces; i++) {
+          if (engine.uf.getGroupSize(i) > (groupSizesBefore.get(i) ?? 0)) {
+            mergedRoots.add(engine.uf.find(i));
+          }
+        }
+        if (mergedRoots.size > 0) {
+          const groups: number[][] = [];
+          mergedRoots.forEach((root) => {
+            for (let i = 0; i < totalPieces; i++) {
+              if (engine.uf.find(i) === root) {
+                groups.push(engine.uf.getGroupMembers(i));
+                break;
+              }
+            }
+          });
+          puzzleBoardRef.current?.triggerMergeEffect(groups);
+        }
         if (engine.isComplete) setTimeout(() => handleWin(), 400);
         break;
       }
@@ -315,6 +340,7 @@ export default function Home() {
               </div>
 
               <PuzzleBoard
+                ref={puzzleBoardRef}
                 engine={engine}
                 imageUrl={currentLevel.imageUrl}
                 showNumbers={showNumbers}

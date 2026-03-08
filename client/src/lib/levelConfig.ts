@@ -70,12 +70,16 @@ const getBaseUrl = () => (typeof import.meta !== 'undefined' && import.meta.env?
 /** 漫画连载主题关卡图（15 张循环使用） */
 const COMIC_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}comic/comic-${i + 1}.png`);
 
+/** 二次元主题关卡图（15 张循环使用，1–3 为 jpeg，4–15 为 png） */
+const ERCIYUAN_EXTS = ['jpeg', 'jpeg', 'jpeg', ...Array.from({ length: 12 }, () => 'png')];
+const ERCIYUAN_IMGS = Array.from({ length: 15 }, (_, i) => `${getBaseUrl()}erciyuan/erciyuan-${i + 1}.${ERCIYUAN_EXTS[i]}`);
+
 const THEME_COVERS: Record<ThemeId, string> = {
   retro: `${getBaseUrl()}theme-cover-retro.png`,
   marvel: `${getBaseUrl()}theme-cover-comic.png`,
   guofeng:
     'https://d2xsxph8kpxj0f.cloudfront.net/310419663028373717/gXcdKD4ijsoo6c6S8DJhhB/puzzle-img-3-N5zFytSfaCvy4N8ub7jMKv.webp',
-  landscape: `${getBaseUrl()}theme-cover-landscape.jpg`,
+  landscape: `${getBaseUrl()}theme-cover-erciyuan.png`,
 };
 
 /** 四大主题（开发环境用同一批图循环） */
@@ -83,14 +87,14 @@ export const THEMES: ThemeInfo[] = [
   { id: 'retro', name: '年代感', coverImageUrl: THEME_COVERS.retro, imageUrls: GUOFENG_IMGS },
   { id: 'marvel', name: '漫画连载', coverImageUrl: THEME_COVERS.marvel, imageUrls: COMIC_IMGS },
   { id: 'guofeng', name: '国风动画', coverImageUrl: THEME_COVERS.guofeng, imageUrls: GUOFENG_IMGS },
-  { id: 'landscape', name: '风景大片', coverImageUrl: THEME_COVERS.landscape, imageUrls: GUOFENG_IMGS },
+  { id: 'landscape', name: '二次元', coverImageUrl: THEME_COVERS.landscape, imageUrls: ERCIYUAN_IMGS },
 ];
 
 const LEVEL_NAMES: Record<ThemeId, string[]> = {
   retro: Array.from({ length: TOTAL_LEVELS }, (_, i) => `年代关 ${i + 1}`),
   marvel: Array.from({ length: TOTAL_LEVELS }, (_, i) => `漫画关 ${i + 1}`),
   guofeng: ['齐天大圣', '山水画卷', '祥龙腾云', '古街集市', ...Array.from({ length: TOTAL_LEVELS - 4 }, (_, i) => `国风关 ${i + 5}`)],
-  landscape: Array.from({ length: TOTAL_LEVELS }, (_, i) => `风景关 ${i + 1}`),
+  landscape: Array.from({ length: TOTAL_LEVELS }, (_, i) => `二次元关 ${i + 1}`),
 };
 
 /** 获取某一主题下某一关的 LevelInfo */

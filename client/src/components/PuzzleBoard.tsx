@@ -9,9 +9,14 @@
  * 不使用 setPointerCapture（会干扰 click 事件）
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, type Ref, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { PuzzleEngine } from '@/lib/puzzleEngine';
 import { playPickup, playPlace, playMerge } from '@/lib/puzzleSound';
+
+export interface PuzzleBoardHandle {
+  /** 触发合并动效与音效（磁铁等外部操作导致合并时调用） */
+  triggerMergeEffect: (groups: number[][]) => void;
+}
 
 interface PuzzleBoardProps {
   engine: PuzzleEngine;
@@ -21,7 +26,7 @@ interface PuzzleBoardProps {
   onWin: () => void;
 }
 
-export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onWin }: PuzzleBoardProps) {
+function PuzzleBoardInner({ engine, imageUrl, showNumbers, onMove, onWin }: PuzzleBoardProps, ref: Ref<PuzzleBoardHandle>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -46,6 +51,15 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
 
   const MERGE_FLASH_DURATION = 480;
   const mergeFlashRef = useRef<{ groups: number[][]; startTime: number } | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    triggerMergeEffect(groups: number[][]) {
+      if (groups.length === 0) return;
+      playMerge();
+      mergeFlashRef.current = { groups, startTime: Date.now() };
+      forceRender((n) => n + 1);
+    },
+  }), []);
 
   const getCanvasSize = useCallback(() => {
     return Math.min(window.innerWidth - 32, 440);
@@ -898,3 +912,6 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
     </div>
   );
 }
+
+const PuzzleBoard = forwardRef(PuzzleBoardInner);
+export default PuzzleBoard;
