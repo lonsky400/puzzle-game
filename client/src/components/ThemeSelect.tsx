@@ -52,7 +52,7 @@ export default function ThemeSelect({ onSelect }: ThemeSelectProps) {
               className="relative overflow-hidden rounded-xl text-left"
               style={{ boxShadow: '0 3px 16px rgba(60, 50, 40, 0.15)' }}
             >
-              <div className="aspect-[4/3] overflow-hidden bg-[#E8E0D0] relative">
+              <div className="aspect-[2/3] overflow-hidden bg-[#E8E0D0] relative">
                 {!coverFailed && (
                   <img
                     src={theme.coverImageUrl}

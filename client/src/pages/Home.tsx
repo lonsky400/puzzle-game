@@ -12,6 +12,7 @@ import ThemeSelect from '@/components/ThemeSelect';
 import LevelSelect from '@/components/LevelSelect';
 import WinOverlay from '@/components/WinOverlay';
 import ReferenceImage from '@/components/ReferenceImage';
+import Gallery from '@/components/Gallery';
 import { PuzzleEngine } from '@/lib/puzzleEngine';
 import {
   type ThemeId,
@@ -51,6 +52,7 @@ export default function Home() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showNumbers, setShowNumbers] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'home' | 'gallery'>('home');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -222,8 +224,11 @@ export default function Home() {
       </header>
 
       <main
-        className={`flex-1 flex flex-col items-center min-h-0 pb-4 sm:pb-6 ${gameState === 'levelSelect' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        className={`flex-1 flex flex-col items-center min-h-0 pb-4 sm:pb-6 ${activeTab === 'gallery' ? 'overflow-y-auto' : gameState === 'levelSelect' ? 'overflow-hidden' : 'overflow-y-auto'}`}
       >
+        {activeTab === 'gallery' ? (
+          <Gallery stars={stars} />
+        ) : (
         <AnimatePresence mode="wait">
           {gameState === 'themeSelect' && (
             <motion.div
@@ -435,7 +440,45 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </main>
+
+      {/* 底部 Tab：主页 | 相册 */}
+      <footer
+        className="shrink-0 flex items-center justify-center gap-0 w-full max-w-[500px] mx-auto px-4 py-2.5 sm:py-3 border-t border-[rgba(139,134,128,0.2)]"
+      >
+        <button
+          onClick={() => setActiveTab('home')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all"
+          style={{
+            color: activeTab === 'home' ? '#C4463A' : '#6B6560',
+            fontFamily: "'Noto Serif SC', serif",
+            backgroundColor: activeTab === 'home' ? 'rgba(196, 70, 58, 0.1)' : 'transparent',
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          主页
+        </button>
+        <button
+          onClick={() => setActiveTab('gallery')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-all"
+          style={{
+            color: activeTab === 'gallery' ? '#C4463A' : '#6B6560',
+            fontFamily: "'Noto Serif SC', serif",
+            backgroundColor: activeTab === 'gallery' ? 'rgba(196, 70, 58, 0.1)' : 'transparent',
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          相册
+        </button>
+      </footer>
 
       <AnimatePresence>
         {gameState === 'win' && currentLevel && (
