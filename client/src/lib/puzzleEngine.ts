@@ -155,107 +155,177 @@ export class PuzzleEngine {
   }
 
   /**
-   * 核心交换逻辑：
-   * 
-   * 整组拖拽交换规则：
-   * 1. 获取拖拽起点所在的组 A
-   * 2. 按偏移量 (rowOff, colOff) 计算组 A 的新位置
-   * 3. 收集目标区域（新位置覆盖的范围）内所有被占据的位置及其拼图块
-   * 4. 将组 A 整体移动到新位置，将目标区域的块移动到组 A 的原位置
-   * 5. 如果越界、内部重叠或槽位不足，退化为单块交换
+   * 将组偏移量钳位到网格内，使组内所有块的目标坐标不越界。
+   * 用于「吸附到最近合法位置」的越界保护。
+   */
+  private clampGroupOffset(fromPositions: number[], rowOff: number, colOff: number): { rowOff: number; colOff: number } {
+    if (fromPositions.length === 0) return { rowOff: 0, colOff: 0 };
+    let minR = this.gridSize, maxR = -1, minC = this.gridSize, maxC = -1;
+    for (const p of fromPositions) {
+      const r = Math.floor(p / this.gridSize);
+      const c = p % this.gridSize;
+      minR = Math.min(minR, r);
+      maxR = Math.max(maxR, r);
+      minC = Math.min(minC, c);
+      maxC = Math.max(maxC, c);
+    }
+    let ro = rowOff;
+    let co = colOff;
+    if (minR + ro < 0) ro = -minR;
+    if (maxR + ro >= this.gridSize) ro = this.gridSize - 1 - maxR;
+    if (minC + co < 0) co = -minC;
+    if (maxC + co >= this.gridSize) co = this.gridSize - 1 - maxC;
+    return { rowOff: ro, colOff: co };
+  }
+
+  /**
+   * 按偏移量计算组的目标网格坐标；若有越界则返回 null。
+   */
+  getGroupTargetPositions(fromPositions: number[], rowOff: number, colOff: number): number[] | null {
+    const out: number[] = [];
+    for (const p of fromPositions) {
+      const r = Math.floor(p / this.gridSize) + rowOff;
+      const c = (p % this.gridSize) + colOff;
+      if (r < 0 || r >= this.gridSize || c < 0 || c >= this.gridSize) return null;
+      out.push(r * this.gridSize + c);
+    }
+    return out;
+  }
+
+  /**
+   * 曼哈顿距离（用于独立块空位分配：最近优先）
+   */
+  private manhattan(posA: number, posB: number): number {
+    const ra = Math.floor(posA / this.gridSize), ca = posA % this.gridSize;
+    const rb = Math.floor(posB / this.gridSize), cb = posB % this.gridSize;
+    return Math.abs(ra - rb) + Math.abs(ca - cb);
+  }
+
+  /**
+   * 核心交换逻辑（对齐 Untitled-1.ini 图块组移动规则 — Group-Segmented Evacuation）：
+   *
+   * 主动组保持完整形状整体进入目标位置；被动组仅「重叠区」的块被剥离为独立块填入空位，
+   * 「非重叠区」的块保留在原位（连通性在 rebuildUnionFind 后自然形成保留组/新子组）。
    */
   swap(fromPos: number, toPos: number): boolean {
+    return this.swapWithFallback(fromPos, toPos);
+  }
+
+  /**
+   * 滑入空位（经典滑动拼图规则）：仅当落点为空且起点与空位四方向相邻、且起点为单块时，该块滑入空位。
+   * 对应关键帧场景：网格中有一个空槽，只有与空位相邻的那一块可以移入空位。
+   */
+  private slideIntoEmpty(fromPos: number, emptyPos: number, fromPieceId: number): boolean {
+    const fromGroup = this.uf.getGroupMembers(fromPieceId);
+    if (fromGroup.length !== 1) return false;
+    if (this.manhattan(fromPos, emptyPos) !== 1) return false;
+
+    this.pieces[fromPieceId].currentPos = emptyPos;
+    this.rebuildPositionMap();
+    this.rebuildUnionFind();
+    this.moveCount++;
+    this.checkWin();
+    return true;
+  }
+
+  /** 越界或目标自交时退化为单块交换 */
+  swapSingle(fromPos: number, toPos: number): boolean {
     const fromPieceId = this.positionMap[fromPos];
     const toPieceId = this.positionMap[toPos];
-
     if (fromPieceId === -1 || toPieceId === -1) return false;
     if (this.uf.connected(fromPieceId, toPieceId)) return false;
 
-    const fromGroup = this.uf.getGroupMembers(fromPieceId);
-    
-    // 计算偏移量
-    const fromRow = Math.floor(fromPos / this.gridSize);
-    const fromCol = fromPos % this.gridSize;
-    const toRow = Math.floor(toPos / this.gridSize);
-    const toCol = toPos % this.gridSize;
-    const rowOff = toRow - fromRow;
-    const colOff = toCol - fromCol;
-
-    // 尝试整组交换（组大小 > 1 时才尝试）
-    if (fromGroup.length > 1) {
-      const fromPositions = fromGroup.map(id => this.pieces[id].currentPos);
-      
-      // 计算组 A 的新位置
-      const newFromPositions = fromPositions.map(p => {
-        const r = Math.floor(p / this.gridSize) + rowOff;
-        const c = (p % this.gridSize) + colOff;
-        if (r < 0 || r >= this.gridSize || c < 0 || c >= this.gridSize) return -1;
-        return r * this.gridSize + c;
-      });
-
-      // 检查是否有越界
-      if (newFromPositions.every(p => p !== -1)) {
-        // 收集目标区域内的所有拼图块（去重，同一组的只算一次）
-        const targetPieceIds = new Set<number>();
-        const newFromPosSet = new Set(newFromPositions);
-        
-        for (const newPos of newFromPositions) {
-          const pieceId = this.positionMap[newPos];
-          if (pieceId !== -1 && !this.uf.connected(pieceId, fromPieceId)) {
-            targetPieceIds.add(this.uf.find(pieceId)); // 用根节点代表整组
-          }
-        }
-
-        // 收集目标组的所有块及其位置
-        const targetGroups: number[][] = [];
-        for (const rootId of Array.from(targetPieceIds)) {
-          targetGroups.push(this.uf.getGroupMembers(rootId));
-        }
-
-        // 计算目标组需要移动到的位置（组 A 的原位置）
-        const targetOldPositions: number[] = [];
-        for (const group of targetGroups) {
-          for (const pieceId of group) {
-            targetOldPositions.push(this.pieces[pieceId].currentPos);
-          }
-        }
-
-        // 检查：目标组的总块数必须等于组 A 的块数（位置一一对应）
-        if (targetOldPositions.length === fromGroup.length) {
-          // 检查新位置是否有重叠（组 A 的新位置之间不能重叠）
-          const newPosSet = new Set(newFromPositions);
-          if (newPosSet.size === newFromPositions.length) {
-            // 执行整组交换
-            // 1. 移动组 A 到新位置
-            for (let i = 0; i < fromGroup.length; i++) {
-              this.pieces[fromGroup[i]].currentPos = newFromPositions[i];
-            }
-            
-            // 2. 移动目标组到组 A 的原位置
-            let posIdx = 0;
-            for (const group of targetGroups) {
-              for (const pieceId of group) {
-                this.pieces[pieceId].currentPos = fromPositions[posIdx++];
-              }
-            }
-
-            this.rebuildPositionMap();
-            this.rebuildUnionFind();
-            this.moveCount++;
-            this.checkWin();
-            return true;
-          }
-        }
-      }
-    }
-
-    // 退化为单块交换：直接交换 fromPos 和 toPos 上的两个块
     const fromPiece = this.pieces[fromPieceId];
     const toPiece = this.pieces[toPieceId];
-
     const tempPos = fromPiece.currentPos;
     fromPiece.currentPos = toPiece.currentPos;
     toPiece.currentPos = tempPos;
+
+    this.rebuildPositionMap();
+    this.rebuildUnionFind();
+    this.moveCount++;
+    this.checkWin();
+    return true;
+  }
+
+  /**
+   * 图块组移动（Group-Segmented Evacuation，对齐 Untitled-2.ini）：
+   *
+   * STEP 1 目标占用 targetSlots = newFromPositions；STEP 2 识别碰撞 → coveredBlocks=stripped（孤儿块），其余=保留块。
+   * 2.2.1–2.2.3 被覆盖块剥离为孤儿；保留块留在原位（连通性由 rebuildUnionFind 体现：单连通保留同组，多段拆成新组，空则组注销）。
+   * 2.2.4 空位池 = 主动组「离开且未再占」的格（fromPositions \ newFromPositions）。被动目标块数少于主动组且不越界时，主动组会部分仍占原位，只释放非重叠格；保证主动组连续成组，被挤块独立填入上述空位。2.2.5 仅当孤儿数 === 空位数时执行，保证移动后无空位。
+   * 场景2 主动组部分悬空：目标越界或自交时操作无效(return false)，不执行单块交换。步骤6 主动组落位；步骤7 合并检测。
+   */
+  swapWithFallback(fromPos: number, toPos: number): boolean {
+    const fromPieceId = this.positionMap[fromPos];
+    const toPieceId = this.positionMap[toPos];
+    if (fromPieceId === -1) return false;
+
+    if (toPieceId === -1) {
+      return this.slideIntoEmpty(fromPos, toPos, fromPieceId);
+    }
+
+    if (this.uf.connected(fromPieceId, toPieceId)) return false;
+
+    const fromGroup = this.uf.getGroupMembers(fromPieceId);
+    const fromPositions = fromGroup.map(id => this.pieces[id].currentPos);
+    const toRow = Math.floor(toPos / this.gridSize);
+    const toCol = toPos % this.gridSize;
+    // 主动组视为整体：用组外接左上角为锚点计算偏移，与点击具体哪一块无关
+    let anchorRow = this.gridSize, anchorCol = this.gridSize;
+    for (const p of fromPositions) {
+      anchorRow = Math.min(anchorRow, Math.floor(p / this.gridSize));
+      anchorCol = Math.min(anchorCol, p % this.gridSize);
+    }
+    let rowOff = toRow - anchorRow;
+    let colOff = toCol - anchorCol;
+    const clamped = this.clampGroupOffset(fromPositions, rowOff, colOff);
+    rowOff = clamped.rowOff;
+    colOff = clamped.colOff;
+    const newFromPositions = this.getGroupTargetPositions(fromPositions, rowOff, colOff);
+    if (newFromPositions === null) return false;
+    if (new Set(newFromPositions).size !== newFromPositions.length) return false;
+
+    const stripped: number[] = [];
+    for (const pos of newFromPositions) {
+      const pieceId = this.positionMap[pos];
+      if (pieceId === -1 || this.uf.connected(pieceId, fromPieceId)) continue;
+      stripped.push(pieceId);
+    }
+
+    const newFromSet = new Set(newFromPositions);
+    const freeSlots = fromPositions.filter(p => !newFromSet.has(p)).sort((a, b) => a - b);
+    if (stripped.length > freeSlots.length) return false;
+    if (stripped.length !== freeSlots.length) return false;
+
+    const assigned = new Set<number>();
+    const assignSlot = (pieceId: number): number => {
+      const cur = this.pieces[pieceId].currentPos;
+      let best = -1;
+      let bestDist = Infinity;
+      for (let i = 0; i < freeSlots.length; i++) {
+        if (assigned.has(i)) continue;
+        const d = this.manhattan(cur, freeSlots[i]);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      return best;
+    };
+    const strippedWithSlots: { pieceId: number; slotIdx: number }[] = [];
+    for (const pieceId of stripped) {
+      const slotIdx = assignSlot(pieceId);
+      if (slotIdx === -1) return false;
+      assigned.add(slotIdx);
+      strippedWithSlots.push({ pieceId, slotIdx });
+    }
+    for (const { pieceId, slotIdx } of strippedWithSlots) {
+      this.pieces[pieceId].currentPos = freeSlots[slotIdx];
+    }
+    for (let i = 0; i < fromGroup.length; i++) {
+      this.pieces[fromGroup[i]].currentPos = newFromPositions[i];
+    }
 
     this.rebuildPositionMap();
     this.rebuildUnionFind();

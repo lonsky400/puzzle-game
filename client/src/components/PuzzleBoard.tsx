@@ -11,7 +11,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PuzzleEngine } from '@/lib/puzzleEngine';
-import { useAudio } from '@/hooks/useAudio';
 
 interface PuzzleBoardProps {
   engine: PuzzleEngine;
@@ -28,13 +27,8 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
   const rafRef = useRef<number>(0);
   const [, forceRender] = useState(0);
 
-  // 音效
-  const { initAudio, playSound } = useAudio();
-  const audioInitializedRef = useRef(false);
-
   // 选中状态
   const selectedPosRef = useRef<number>(-1);
-  const prevGroupCountRef = useRef<number>(0);
 
   // 拖拽状态
   const isDraggingRef = useRef(false);
@@ -114,39 +108,19 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
   }, [canvasSize]);
 
   const doSwap = useCallback((fromPos: number, toPos: number) => {
-    const groupCountBefore = engine.getGroupCount();
     const success = engine.swap(fromPos, toPos);
     if (success) {
-      const groupCountAfter = engine.getGroupCount();
-      
-      // 播放交换音效
-      playSound('swap');
-      
-      // 检测是否有合并发生（组数减少）
-      if (groupCountAfter < groupCountBefore) {
-        setTimeout(() => playSound('merge'), 50);
-      }
-      
       onMove();
       forceRender(n => n + 1);
       if (engine.isComplete) {
-        setTimeout(() => {
-          playSound('win');
-          onWin();
-        }, 400);
+        setTimeout(() => onWin(), 400);
       }
     }
     return success;
-  }, [engine, onMove, onWin, playSound]);
+  }, [engine, onMove, onWin]);
 
   // 统一的交互处理
   const handleInteractionStart = useCallback((clientX: number, clientY: number) => {
-    // 初始化音频（首次用户交互时）
-    if (!audioInitializedRef.current) {
-      initAudio();
-      audioInitializedRef.current = true;
-    }
-
     if (engine.isComplete) return;
 
     const pos = screenToGrid(clientX, clientY);
@@ -168,7 +142,7 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
     dragGroupPosRef.current = groupPositions;
     dragHoverPosRef.current = pos;
     dragThresholdMetRef.current = false;
-  }, [engine, screenToGrid, initAudio]);
+  }, [engine, screenToGrid]);
 
   const handleInteractionMove = useCallback((clientX: number, clientY: number) => {
     if (!isDraggingRef.current) return;
@@ -198,9 +172,6 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
       // 拖拽模式：释放到目标位置
       if (upPos !== -1 && upPos !== startPos) {
         doSwap(startPos, upPos);
-      } else {
-        // 拖拽取消，播放取消音效
-        playSound('cancel');
       }
       selectedPosRef.current = -1;
     } else {
@@ -212,12 +183,8 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
         doSwap(currentSel, clickedPos);
         selectedPosRef.current = -1;
       } else if (currentSel === clickedPos) {
-        // 取消选中
-        playSound('cancel');
         selectedPosRef.current = -1;
       } else {
-        // 新选中
-        playSound('select');
         selectedPosRef.current = clickedPos;
       }
     }
@@ -231,16 +198,10 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
     dragThresholdMetRef.current = false;
 
     forceRender(n => n + 1);
-  }, [screenToGrid, doSwap, playSound]);
+  }, [screenToGrid, doSwap]);
 
   // 处理纯 click 事件（兼容 CDP 自动化和某些浏览器）
   const handleClick = useCallback((clientX: number, clientY: number) => {
-    // 初始化音频
-    if (!audioInitializedRef.current) {
-      initAudio();
-      audioInitializedRef.current = true;
-    }
-
     if (engine.isComplete) return;
 
     const pos = screenToGrid(clientX, clientY);
@@ -259,15 +220,13 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
       doSwap(currentSel, pos);
       selectedPosRef.current = -1;
     } else if (currentSel === pos) {
-      playSound('cancel');
       selectedPosRef.current = -1;
     } else {
-      playSound('select');
       selectedPosRef.current = pos;
     }
 
     forceRender(n => n + 1);
-  }, [engine, screenToGrid, doSwap, playSound, initAudio]);
+  }, [engine, screenToGrid, doSwap]);
 
   // 标记是否通过mousedown/mouseup完成了交互
   const mouseHandledRef = useRef(false);
