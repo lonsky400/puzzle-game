@@ -265,8 +265,6 @@ export class PuzzleEngine {
       return this.slideIntoEmpty(fromPos, toPos, fromPieceId);
     }
 
-    if (this.uf.connected(fromPieceId, toPieceId)) return false;
-
     const fromGroup = this.uf.getGroupMembers(fromPieceId);
     const fromPositions = fromGroup.map(id => this.pieces[id].currentPos);
     const toRow = Math.floor(toPos / this.gridSize);

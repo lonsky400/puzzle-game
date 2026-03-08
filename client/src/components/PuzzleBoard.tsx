@@ -107,6 +107,37 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
     };
   }, [canvasSize]);
 
+  /**
+   * 拖拽结束：用「锚点 + 拖动偏移」决定是否移动，与松手所在格无关。
+   * 仅当偏移量在任一方向上大于半格时触发移动；目标格 = 锚点 + round(偏移格数)。
+   */
+  const getToPosFromDragOffset = useCallback(
+    (
+      anchorRow: number,
+      anchorCol: number,
+      screenDx: number,
+      screenDy: number,
+    ): { toPos: number; shouldMove: boolean } => {
+      const gridSize = engine.gridSize;
+      const gap = Math.max(3, Math.round(canvasSize * 0.008));
+      const cellSize = (canvasSize - gap * (gridSize + 1)) / gridSize;
+      const step = cellSize + gap;
+      const { dx: canvasDx, dy: canvasDy } = screenToCanvasOffset(screenDx, screenDy);
+      const offsetCol = canvasDx / step;
+      const offsetRow = canvasDy / step;
+      const colOff = Math.round(offsetCol);
+      const rowOff = Math.round(offsetRow);
+      const shouldMove = Math.abs(offsetCol) > 0.5 || Math.abs(offsetRow) > 0.5;
+      const toRow = anchorRow + rowOff;
+      const toCol = anchorCol + colOff;
+      if (toRow < 0 || toRow >= gridSize || toCol < 0 || toCol >= gridSize) {
+        return { toPos: -1, shouldMove };
+      }
+      return { toPos: toRow * gridSize + toCol, shouldMove };
+    },
+    [canvasSize, engine, screenToCanvasOffset],
+  );
+
   const doSwap = useCallback((fromPos: number, toPos: number) => {
     const success = engine.swap(fromPos, toPos);
     if (success) {
@@ -166,19 +197,31 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
     }
 
     const startPos = dragStartPosRef.current;
-    const upPos = screenToGrid(clientX, clientY);
+    const gridSize = engine.gridSize;
+    const positions = dragGroupPosRef.current;
 
     if (dragThresholdMetRef.current) {
-      // 拖拽模式：释放到目标位置
-      if (upPos !== -1 && upPos !== startPos) {
-        doSwap(startPos, upPos);
+      // 拖拽模式：与松手所在格无关，用主动组锚点 + 拖动偏移判定；仅当偏移 > 半格时移动
+      const anchorRow = positions.length
+        ? Math.min(...positions.map(p => Math.floor(p / gridSize)))
+        : 0;
+      const anchorCol = positions.length
+        ? Math.min(...positions.map(p => p % gridSize))
+        : 0;
+      const screenDx = clientX - dragStartXRef.current;
+      const screenDy = clientY - dragStartYRef.current;
+      const { toPos, shouldMove } = getToPosFromDragOffset(anchorRow, anchorCol, screenDx, screenDy);
+      // 允许 toPos === startPos：组整体平移时目标格可能恰为按下格（如按下 6 向下拖）
+      if (shouldMove && toPos !== -1) {
+        doSwap(startPos, toPos);
       }
       selectedPosRef.current = -1;
     } else {
       // 点击模式
+      const upPos = screenToGrid(clientX, clientY);
       const clickedPos = upPos !== -1 ? upPos : startPos;
       const currentSel = selectedPosRef.current;
-      
+
       if (currentSel >= 0 && currentSel !== clickedPos) {
         doSwap(currentSel, clickedPos);
         selectedPosRef.current = -1;
@@ -198,7 +241,7 @@ export default function PuzzleBoard({ engine, imageUrl, showNumbers, onMove, onW
     dragThresholdMetRef.current = false;
 
     forceRender(n => n + 1);
-  }, [screenToGrid, doSwap]);
+  }, [engine, screenToGrid, getToPosFromDragOffset, doSwap]);
 
   // 处理纯 click 事件（兼容 CDP 自动化和某些浏览器）
   const handleClick = useCallback((clientX: number, clientY: number) => {
